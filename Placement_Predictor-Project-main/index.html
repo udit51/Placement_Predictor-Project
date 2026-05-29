@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Placement Predictor & IQ Classifier</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.4);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.3);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.3);
+      --background: #070a12;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+
+    body {
+      background: var(--background);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Background blobs */
+    body::before, body::after {
+      content: '';
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      z-index: -1;
+      filter: blur(120px);
+      opacity: 0.22;
+      pointer-events: none;
+    }
+    body::before {
+      background: var(--primary);
+      top: 5%;
+      left: 8%;
+    }
+    body::after {
+      background: #8b5cf6;
+      bottom: 5%;
+      right: 8%;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      z-index: 10;
+    }
+
+    /* Tab switcher style */
+    .tab-switcher {
+      display: flex;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 0.35rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      gap: 0.25rem;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.85rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px var(--primary-glow);
+    }
+
+    /* Card Box */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid var(--border-color);
+      border-radius: 30px;
+      padding: 2.5rem;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4), 
+                  0 0 60px rgba(99, 102, 241, 0.03);
+      position: relative;
+      overflow: hidden;
+      min-height: 480px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Cyber scan bar */
+    .scanner-line {
+      position: absolute;
+      top: -2px;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      box-shadow: 0 0 15px var(--primary), 0 0 30px var(--primary);
+      opacity: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    @keyframes scan {
+      0% { top: 0%; opacity: 1; }
+      50% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .card.scanning .scanner-line {
+      animation: scan 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    /* Header styling */
+    .header {
+      text-align: center;
+      margin-bottom: 2.25rem;
+    }
+
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 18px;
+      margin-bottom: 1rem;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .logo-wrap svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 2;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 40%, #c7d2fe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.4rem;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .mode-view {
+      display: none;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .mode-view.active {
+      display: flex;
+    }
+
+    /* Form control elements */
+    .form-group {
+      margin-bottom: 1.75rem;
+    }
+
+    .label-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.65rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .value-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.12);
+      padding: 0.2rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid rgba(99, 102, 241, 0.15);
+    }
+
+    /* Custom range input styling */
+    .slider-box {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .slider-box input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider-box input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .slider-box input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: var(--primary);
+      border-color: #fff;
+    }
+
+    .num-selector-wrap {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 0.2rem 0.4rem;
+    }
+
+    .num-selector-wrap:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    .num-selector-wrap input[type="number"] {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.5rem;
+      width: 100%;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .num-selector-wrap input::-webkit-outer-spin-button,
+    .num-selector-wrap input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .adjust-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .adjust-btn:hover {
+      background: rgba(99, 102, 241, 0.15);
+      color: #fff;
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    /* Quiz specific components */
+    .wizard-step {
+      display: none;
+      flex-direction: column;
+      flex-grow: 1;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .wizard-step.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Quiz Telemetry Grid */
+    .quiz-meta-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .quiz-progress-text {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .quiz-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      padding: 0.3rem 0.7rem;
+      border-radius: 8px;
+    }
+
+    /* Custom progress bar */
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 99px;
+      margin-bottom: 2rem;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #8b5cf6);
+      width: 0%;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* High fidelity MCQ card options */
+    .quiz-card {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 1.75rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-badge {
+      display: inline-block;
+      font-size: 0.725rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-question-text {
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.5;
+      color: #fff;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+    }
+
+    .mcq-option {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 1.1rem 1.3rem;
+      text-align: left;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      position: relative;
+    }
+
+    .mcq-option:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateX(5px);
+    }
+
+    .mcq-option.selected {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    }
+
+    .mcq-option-letter {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+
+    .mcq-option.selected .mcq-option-letter {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* Actions and Buttons */
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      margin-top: auto;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 1.1rem;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: none;
+      outline: none;
+    }
+
+    .action-btn.secondary {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      color: var(--text);
+    }
+
+    .action-btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      color: #fff;
+      box-shadow: 0 8px 16px var(--primary-glow);
+    }
+
+    .action-btn.primary:hover {
+      background: linear-gradient(135deg, var(--primary-hover) 0%, #3b32cc 100%);
+      box-shadow: 0 10px 20px rgba(99, 102, 241, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .action-btn.primary:active {
+      transform: translateY(0);
+    }
+
+    .action-btn.primary:disabled {
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* Hacker Terminal logs */
+    .terminal-step {
+      display: none;
+      flex-direction: column;
+      flex-grow: 1;
+      background: #030611;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #34d399;
+      height: 340px;
+      overflow-y: auto;
+      box-shadow: inset 0 0 25px rgba(0,0,0,0.85);
+      position: relative;
+    }
+
+    .terminal-step::-webkit-scrollbar {
+      width: 4px;
+    }
+    .terminal-step::-webkit-scrollbar-thumb {
+      background: rgba(52, 211, 153, 0.2);
+      border-radius: 2px;
+    }
+
+    .terminal-line {
+      margin-bottom: 0.55rem;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .terminal-line.info { color: #60a5fa; }
+    .terminal-line.success { color: #34d399; }
+    .terminal-line.warn { color: #fbbf24; }
+    .terminal-line.blink::after {
+      content: '█';
+      animation: blink 0.8s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    /* Unified Dashboard Results layout */
+    .results-dashboard {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 2rem;
+      margin-bottom: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+
+    .dashboard-metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    .metric-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 18px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.3rem;
+    }
+
+    .metric-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    /* Placement probability gauge */
+    .outcome-flex-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 1.5rem;
+      padding: 0.5rem 0;
+    }
+
+    /* Radial Circle Progress Bar */
+    .radial-gauge-container {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radial-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .radial-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.05);
+      stroke-width: 10;
+    }
+
+    .radial-progress {
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 408.4;
+      stroke-dashoffset: 408.4;
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .radial-text-value {
+      position: absolute;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .outcome-description-panel {
+      border-radius: 20px;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px solid transparent;
+      width: 100%;
+    }
+
+    .outcome-description-panel.placed {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+
+    .outcome-description-panel.not-placed {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .outcome-status-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .outcome-description-panel.placed .outcome-status-title { color: var(--success); }
+    .outcome-description-panel.not-placed .outcome-status-title { color: #f87171; }
+
+    .outcome-feedback-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* Confetti effect */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.725rem;
+      color: rgba(255, 255, 255, 0.15);
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <div class="container">
+    
+    <!-- Tab Controls to switch Mode A / B -->
+    <div class="tab-switcher" id="switcher-panel">
+      <button class="tab-btn active" id="tab-direct" onclick="switchTab('direct')">
+        <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"></path></svg>
+        Direct Prediction Mode
+      </button>
+      <button class="tab-btn" id="tab-eval" onclick="switchTab('eval')">
+        <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21l8.904-4.477m-8.904 0L4 16.242M18 17.5l-4-4m-1.42-3.18a3.75 3.75 0 11-5.3 5.3 3.75 3.75 0 015.3-5.3zM16.5 6.75h.008v.008H16.5V6.75zM19.5 9h.008v.008H19.5V9zm.75-2.25h.008v.008h-.008V6.75zM18 4.5h.008v.008H18V4.5z"></path></svg>
+        MCQ Cognitive Mode
+      </button>
+    </div>
+
+    <!-- Main Card container -->
+    <div class="card" id="main-card">
+      <div class="scanner-line"></div>
+      
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-wrap">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 id="main-title">Placement Predictor</h1>
+        <p class="subtitle" id="main-subtitle">AI-powered analytics classification engine</p>
+      </div>
+
+      <!-- Mode 1: Direct Entry Mode (Phase 1) -->
+      <div class="mode-view active" id="view-direct">
+        <form id="direct-form">
+          <!-- IQ Slider -->
+          <div class="form-group">
+            <div class="label-header">
+              <label for="direct-iq">Cognitive Score (IQ)</label>
+              <span class="value-badge" id="direct-iq-badge">100</span>
+            </div>
+            <div class="slider-box">
+              <input type="range" id="direct-iq" min="50" max="150" value="100">
+            </div>
+            <div class="num-selector-wrap">
+              <button type="button" class="adjust-btn" onclick="adjustDirectIq(-5)">-5</button>
+              <input type="number" id="direct-iq-num" min="50" max="150" value="100">
+              <button type="button" class="adjust-btn" onclick="adjustDirectIq(5)">+5</button>
+            </div>
+          </div>
+
+          <!-- CGPA Slider -->
+          <div class="form-group">
+            <div class="label-header">
+              <label for="direct-cgpa">Academic CGPA</label>
+              <span class="value-badge" id="direct-cgpa-badge">7.5</span>
+            </div>
+            <div class="slider-box">
+              <input type="range" id="direct-cgpa" min="0" max="10" value="7.5" step="0.1">
+            </div>
+            <div class="num-selector-wrap">
+              <button type="button" class="adjust-btn" onclick="adjustDirectCgpa(-0.5)">-0.5</button>
+              <input type="number" id="direct-cgpa-num" min="0" max="10" value="7.5" step="0.1">
+              <button type="button" class="adjust-btn" onclick="adjustDirectCgpa(0.5)">+0.5</button>
+            </div>
+          </div>
+
+          <!-- Submit Direct Button -->
+          <button type="submit" class="action-btn primary" id="direct-submit-btn" style="width:100%; margin-top: 1.5rem;">
+            <span class="spinner" id="direct-spinner" style="display:none;"></span>
+            <span id="direct-btn-text">Execute AI Classification</span>
+          </button>
+        </form>
+
+        <!-- Direct Outcomes display (Gauge & Panel) -->
+        <div class="result-container" id="direct-result-wrap" style="margin-top: 2rem; display: none;">
+          <div class="results-dashboard" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 1.5rem;">
+            <div class="outcome-flex-container">
+              
+              <!-- Radial Probability Circle -->
+              <div class="radial-gauge-container">
+                <svg class="radial-svg" viewBox="0 0 140 140">
+                  <circle class="radial-bg" cx="70" cy="70" r="65"></circle>
+                  <circle class="radial-progress" id="direct-radial-bar" cx="70" cy="70" r="65"></circle>
+                </svg>
+                <div class="radial-text-value" id="direct-prob-value">0.0%</div>
+              </div>
+              
+              <div class="outcome-description-panel" id="direct-outcome-panel" style="margin-top: 0;">
+                <div class="outcome-status-title" id="direct-outcome-status">Prediction Status</div>
+                <p class="outcome-feedback-desc" id="direct-outcome-desc"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode 2: MCQ-Driven IQ & Placement Mode (Phase 2) -->
+      <div class="mode-view" id="view-eval">
+        
+        <!-- Step 1: CGPA Entry & Assessment Start -->
+        <div class="wizard-step active" id="step-intro">
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <div class="label-header">
+              <label>Academic CGPA</label>
+              <span class="value-badge" id="eval-cgpa-badge">7.5</span>
+            </div>
+            <div class="slider-box" style="margin-bottom: 1rem;">
+              <input type="range" id="eval-cgpa" min="0" max="10" value="7.5" step="0.1">
+            </div>
+            <div class="num-selector-wrap">
+              <button type="button" class="adjust-btn" onclick="adjustEvalCgpa(-0.5)">-0.5</button>
+              <input type="number" id="eval-cgpa-num" min="0" max="10" value="7.5" step="0.1">
+              <button type="button" class="adjust-btn" onclick="adjustEvalCgpa(0.5)">+0.5</button>
+            </div>
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; margin-bottom: 2rem;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              🧠 <strong>Cognitive Assessment Guidelines:</strong> You will be presented with 20 college-level multiple-choice questions covering logic, quantitative sequences, verbal relationships, and spatial metrics. Take your time—each question is carefully curated to measure reasoning accuracy.
+            </p>
+          </div>
+
+          <div class="button-group">
+            <button type="button" class="action-btn primary" onclick="startCognitiveQuiz()">
+              Launch Cognitive IQ Assessment &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2: Immersive Quiz MCQ Deck -->
+        <div class="wizard-step" id="step-quiz">
+          
+          <div class="quiz-meta-grid">
+            <span class="quiz-progress-text" id="quiz-progress-label">Question 1 of 20</span>
+            <span class="quiz-timer" id="quiz-timer-label">Time: 00:00</span>
+          </div>
+
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="quiz-progress-bar"></div>
+          </div>
+
+          <div class="quiz-card" id="quiz-card-box">
+            <span class="category-badge" id="quiz-category-label">Logical Reasoning</span>
+            <div class="quiz-question-text" id="quiz-question-element"></div>
+          </div>
+
+          <!-- Answer options selection -->
+          <div class="options-grid" id="quiz-options-element" style="margin-bottom: 2rem;">
+            <!-- Buttons injected dynamically -->
+          </div>
+
+          <div class="button-group">
+            <button type="button" class="action-btn secondary" id="btn-quiz-back" onclick="previousQuizQuestion()">
+              &larr; Back
+            </button>
+            <button type="button" class="action-btn primary" id="btn-quiz-next" onclick="nextQuizQuestion()" disabled>
+              Next Question &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Step: Holographic Scanning log output -->
+        <div class="terminal-step" id="step-terminal">
+          <!-- Text dynamically loaded here -->
+        </div>
+
+        <!-- Step 4: Final Outcome Dashboard Results -->
+        <div class="wizard-step" id="step-results">
+          <div class="results-dashboard">
+            <div class="dashboard-metrics-grid">
+              <div class="metric-box">
+                <div class="metric-value" id="metric-iq">0</div>
+                <div class="metric-subtitle">Assessed IQ Score</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-value" id="metric-cgpa">0.0</div>
+                <div class="metric-subtitle">Entered CGPA</div>
+              </div>
+            </div>
+            
+            <div class="outcome-flex-container">
+              <!-- Radial Probability Circle Gauge -->
+              <div class="radial-gauge-container">
+                <svg class="radial-svg" viewBox="0 0 140 140">
+                  <circle class="radial-bg" cx="70" cy="70" r="65"></circle>
+                  <circle class="radial-progress" id="eval-radial-bar" cx="70" cy="70" r="65"></circle>
+                </svg>
+                <div class="radial-text-value" id="eval-prob-value">0.0%</div>
+              </div>
+              
+              <div class="outcome-description-panel" id="eval-outcome-panel" style="margin-top: 0;">
+                <div class="outcome-status-title" id="eval-outcome-status">Prediction Status</div>
+                <p class="outcome-feedback-desc" id="eval-outcome-desc"></p>
+              </div>
+            </div>
+          </div>
+          <div class="button-group">
+            <button type="button" class="action-btn primary" onclick="resetCognitiveWizard()">
+              Assess Another Profile
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Details footer -->
+    <div class="footer">
+      Classification Model: Logistic Regression • Scaler: StandardScaler
+    </div>
+  </div>
+
+  <script>
+    // Embedded bank of 20 high-quality, standardized IQ questions
+    const IQ_QUESTIONS = [
+      {
+        category: "Logical Reasoning",
+        question: "All developers are coders. Some coders are engineers. No engineers are designers. Which of the following statements must be logically true?",
+        options: [
+          "Some developers are designers",
+          "Some coders are not designers",
+          "All developers are engineers",
+          "No coders are designers"
+        ],
+        correctIndex: 1
+      },
+      {
+        category: "Logical Reasoning",
+        question: "Five students (A, B, C, D, E) took an exam. A scored higher than B, but lower than C. D scored higher than E, but lower than B. Who scored the highest?",
+        options: ["Student A", "Student B", "Student C", "Student D"],
+        correctIndex: 2
+      },
+      {
+        category: "Logical Reasoning",
+        question: "John says: 'Mary is the liar.' Mary says: 'Peter is the liar.' Peter says: 'I am the liar.' If only one person tells the truth, one lies, and one alternates (starts with a lie), who is the consistent truth-teller?",
+        options: ["John", "Mary", "Peter", "Cannot be determined"],
+        correctIndex: 0
+      },
+      {
+        category: "Logical Reasoning",
+        question: "If all Wombats are Glipglops, and some Glipglops are Snorkeys, are some Wombats definitely Snorkeys?",
+        options: ["Yes, definitely", "No, not necessarily", "Only under specific conditions", "Insufficient data to decide"],
+        correctIndex: 1
+      },
+      {
+        category: "Logical Reasoning",
+        question: "If it is raining, then the ground is wet. The ground is dry. What logical conclusion can be drawn?",
+        options: ["It is raining", "It is not raining", "The ground is hot", "No conclusion can be drawn"],
+        correctIndex: 1
+      },
+      {
+        category: "Pattern Recognition",
+        question: "Complete the numerical pattern: 3, 7, 15, 31, 63, ...?",
+        options: ["127", "125", "129", "131"],
+        correctIndex: 0
+      },
+      {
+        category: "Pattern Recognition",
+        question: "What is the next number in this sequence: 2, 3, 5, 8, 13, 21, ...?",
+        options: ["29", "34", "32", "38"],
+        correctIndex: 1
+      },
+      {
+        category: "Pattern Recognition",
+        question: "Find the next perfect square in the sequence: 4, 9, 16, 25, 36, ...?",
+        options: ["42", "45", "49", "54"],
+        correctIndex: 2
+      },
+      {
+        category: "Pattern Recognition",
+        question: "What comes next in the geometric progression: 1/2, 2/4, 4/8, 8/16, ...?",
+        options: ["10/20", "12/24", "16/32", "18/36"],
+        correctIndex: 2
+      },
+      {
+        category: "Pattern Recognition",
+        question: "Complete the alphabetical sequence: Z, X, V, T, R, ...?",
+        options: ["P", "Q", "O", "N"],
+        correctIndex: 0
+      },
+      {
+        category: "Quantitative Aptitude",
+        question: "If 10 machines take 10 minutes to write 10 test cases, how long does it take 100 machines to write 100 test cases?",
+        options: ["100 minutes", "50 minutes", "10 minutes", "1 minute"],
+        correctIndex: 2
+      },
+      {
+        category: "Quantitative Aptitude",
+        question: "A train 1 mile long enters a tunnel that is 5 miles long at a constant speed of 60 mph. How many minutes does it take for the entire train to completely pass through the tunnel?",
+        options: ["5 minutes", "6 minutes", "10 minutes", "12 minutes"],
+        correctIndex: 1
+      },
+      {
+        category: "Quantitative Aptitude",
+        question: "In a lake, there is a patch of lily pads. Every day, the patch doubles in size. If it takes 48 days for the patch to cover the entire lake, how many days does it take to cover half of the lake?",
+        options: ["24 days", "12 days", "47 days", "46 days"],
+        correctIndex: 2
+      },
+      {
+        category: "Quantitative Aptitude",
+        question: "A team of 4 software developers has an average age of 25. If a new manager who is 40 years old joins the team, what is the new average age of the team?",
+        options: ["26 years", "28 years", "30 years", "32 years"],
+        correctIndex: 1
+      },
+      {
+        category: "Quantitative Aptitude",
+        question: "If you double a number, add 10, divide by 2, and then subtract your original number, what is the result?",
+        options: ["10", "5", "2", "The original number"],
+        correctIndex: 1
+      },
+      {
+        category: "Verbal Metrics",
+        question: "Software is to Code as Novel is to ...?",
+        options: ["Author", "Book", "Words", "Publisher"],
+        correctIndex: 2
+      },
+      {
+        category: "Verbal Metrics",
+        question: "Which of the following system programming tools does NOT belong with the others?",
+        options: ["Compiler", "Interpreter", "Linker", "Editor"],
+        correctIndex: 3
+      },
+      {
+        category: "Verbal Metrics",
+        question: "PEACH is to HCAEP as 46251 is to ...?",
+        options: ["15264", "12564", "46251", "15624"],
+        correctIndex: 0
+      },
+      {
+        category: "Verbal Metrics",
+        question: "All books are pages. Some pages are electronic. No electronic items are paper-bound. Which statement is definitely true?",
+        options: [
+          "No books are paper-bound",
+          "Some pages are not paper-bound",
+          "All pages are books",
+          "All paper-bound items are books"
+        ],
+        correctIndex: 1
+      },
+      {
+        category: "Verbal Metrics",
+        question: "Which of the following is the best synonym for 'PRAGMATIC'?",
+        options: ["Idealistic", "Practical", "Eccentric", "Rigid"],
+        correctIndex: 1
+      }
+    ];
+
+    let quizAnswers = {}; // questionIndex -> selectedOptionIndex
+    let currentQuizIndex = 0;
+    let quizTimerInterval = null;
+    let quizSecondsElapsed = 0;
+
+    // ==========================================
+    // TAB ROUTER (Direct Mode vs MCQ Mode)
+    // ==========================================
+    function switchTab(mode) {
+      document.getElementById("tab-direct").classList.toggle("active", mode === 'direct');
+      document.getElementById("tab-eval").classList.toggle("active", mode === 'eval');
+      
+      document.getElementById("view-direct").classList.toggle("active", mode === 'direct');
+      document.getElementById("view-eval").classList.toggle("active", mode === 'eval');
+
+      const title = document.getElementById("main-title");
+      const subtitle = document.getElementById("main-subtitle");
+
+      if (mode === 'direct') {
+        title.textContent = "Placement Predictor";
+        subtitle.textContent = "AI-powered analytics classification engine";
+      } else {
+        title.textContent = "MCQ Cognitive Mode";
+        subtitle.textContent = "Aptitude assessment & placement predictor";
+      }
+    }
+
+    // ==========================================
+    // MODE 1: DIRECT PREDICTION CONTROL
+    // ==========================================
+    const directIq = document.getElementById("direct-iq");
+    const directIqNum = document.getElementById("direct-iq-num");
+    const directIqBadge = document.getElementById("direct-iq-badge");
+
+    const directCgpa = document.getElementById("direct-cgpa");
+    const directCgpaNum = document.getElementById("direct-cgpa-num");
+    const directCgpaBadge = document.getElementById("direct-cgpa-badge");
+
+    function updateDirectIq(val) {
+      val = Math.max(50, Math.min(150, parseInt(val) || 100));
+      directIq.value = val;
+      directIqNum.value = val;
+      directIqBadge.textContent = val;
+    }
+
+    function updateDirectCgpa(val) {
+      val = Math.max(0, Math.min(10, parseFloat(val) || 7.5));
+      val = parseFloat(val.toFixed(2));
+      directCgpa.value = val;
+      directCgpaNum.value = val;
+      directCgpaBadge.textContent = val.toFixed(1);
+    }
+
+    directIq.addEventListener("input", (e) => updateDirectIq(e.target.value));
+    directIqNum.addEventListener("change", (e) => updateDirectIq(e.target.value));
+    directCgpa.addEventListener("input", (e) => updateDirectCgpa(e.target.value));
+    directCgpaNum.addEventListener("change", (e) => updateDirectCgpa(e.target.value));
+
+    function adjustDirectIq(amount) {
+      updateDirectIq(parseInt(directIqNum.value) + amount);
+    }
+
+    function adjustDirectCgpa(amount) {
+      updateDirectCgpa(parseFloat(directCgpaNum.value) + amount);
+    }
+
+    // Direct Form Submit (Prediction)
+    document.getElementById("direct-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      
+      const card = document.getElementById("main-card");
+      const btnText = document.getElementById("direct-btn-text");
+      const spinner = document.getElementById("direct-spinner");
+      const resultWrap = document.getElementById("direct-result-wrap");
+      const outcomePanel = document.getElementById("direct-outcome-panel");
+      const outcomeStatus = document.getElementById("direct-outcome-status");
+      const outcomeDesc = document.getElementById("direct-outcome-desc");
+      const radialBar = document.getElementById("direct-radial-bar");
+      const probText = document.getElementById("direct-prob-value");
+
+      card.classList.add("scanning");
+      btnText.textContent = "Analyzing Profile...";
+      spinner.style.display = "inline-block";
+      resultWrap.style.display = "none";
+
+      const IQ = parseFloat(directIqNum.value);
+      const CGPA = parseFloat(directCgpaNum.value);
+
+      const url = window.location.origin.startsWith("file://") || window.location.origin === "null" || window.location.origin.includes("127.0.0.1")
+        ? "http://127.0.0.1:5000/predict"
+        : "/predict";
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ IQ, CGPA })
+        });
+
+        if (!response.ok) throw new Error("Server error");
+
+        const data = await response.json();
+
+        setTimeout(() => {
+          card.classList.remove("scanning");
+          spinner.style.display = "none";
+          btnText.textContent = "Execute AI Classification";
+
+          const isPlaced = data.placed === 1;
+          const probVal = data.probability || 0.0;
+
+          // Set radial circle dash offset: total is 408.4
+          const offset = 408.4 - (408.4 * probVal) / 100;
+          radialBar.style.stroke = isPlaced ? "var(--success)" : "var(--danger)";
+          radialBar.style.strokeDashoffset = offset;
+          probText.textContent = `${probVal.toFixed(1)}%`;
+
+          outcomePanel.className = "outcome-description-panel " + (isPlaced ? "placed" : "not-placed");
+          outcomeStatus.textContent = isPlaced ? "Placement Highly Probable!" : "Skill Building Advised";
+          outcomeDesc.textContent = data.message;
+
+          resultWrap.style.display = "block";
+          
+          if (isPlaced) triggerConfetti();
+        }, 1200);
+
+      } catch (err) {
+        setTimeout(() => {
+          card.classList.remove("scanning");
+          spinner.style.display = "none";
+          btnText.textContent = "Execute AI Classification";
+          
+          // Simulated fallback prediction logic client-side
+          const cgpa_norm = CGPA / 10.0;
+          const iq_norm = IQ / 150.0;
+          const score = (cgpa_norm * 0.72) + (iq_norm * 0.28);
+          const prob = 1.0 / (1.0 + Math.exp(-12.0 * (score - 0.61)));
+          const probVal = Math.round(prob * 10000) / 100;
+          const isPlaced = probVal >= 50.0;
+          
+          const offset = 408.4 - (408.4 * probVal) / 100;
+          radialBar.style.stroke = isPlaced ? "var(--success)" : "var(--danger)";
+          radialBar.style.strokeDashoffset = offset;
+          probText.textContent = `${probVal.toFixed(1)}%`;
+
+          outcomePanel.className = "outcome-description-panel " + (isPlaced ? "placed" : "not-placed");
+          outcomeStatus.textContent = isPlaced ? "Placement Highly Probable!" : "Skill Building Advised";
+          outcomeDesc.textContent = isPlaced 
+            ? "✅ Placement Ho Jayegi! 🎉 (Fallback Client-Side Prediction)" 
+            : "❌ Placement Nhi Hogi. Skills pe dhyaan doooooooo! (Fallback Client-Side Prediction)";
+
+          resultWrap.style.display = "block";
+          if (isPlaced) triggerConfetti();
+        }, 1200);
+      }
+    });
+
+    // ==========================================
+    // MODE 2: WIZARD & MCQ COGNITIVE CONTROLLER
+    // ==========================================
+    const evalCgpa = document.getElementById("eval-cgpa");
+    const evalCgpaNum = document.getElementById("eval-cgpa-num");
+    const evalCgpaBadge = document.getElementById("eval-cgpa-badge");
+
+    function updateEvalCgpa(val) {
+      val = Math.max(0, Math.min(10, parseFloat(val) || 7.5));
+      val = parseFloat(val.toFixed(2));
+      evalCgpa.value = val;
+      evalCgpaNum.value = val;
+      evalCgpaBadge.textContent = val.toFixed(1);
+    }
+
+    evalCgpa.addEventListener("input", (e) => updateEvalCgpa(e.target.value));
+    evalCgpaNum.addEventListener("change", (e) => updateEvalCgpa(e.target.value));
+
+    function adjustEvalCgpa(amount) {
+      updateEvalCgpa(parseFloat(evalCgpaNum.value) + amount);
+    }
+
+    // Step switching in Wizard
+    function goToEvalStep(stepId) {
+      // Hide all steps
+      document.getElementById("step-intro").classList.remove("active");
+      document.getElementById("step-quiz").classList.remove("active");
+      document.getElementById("step-terminal").style.display = "none";
+      document.getElementById("step-results").classList.remove("active");
+
+      // Show requested step
+      if (stepId === 'intro') {
+        document.getElementById("step-intro").classList.add("active");
+        document.getElementById("switcher-panel").style.display = "flex";
+      } else if (stepId === 'quiz') {
+        document.getElementById("step-quiz").classList.add("active");
+        document.getElementById("switcher-panel").style.display = "none";
+      } else if (stepId === 'terminal') {
+        document.getElementById("step-terminal").style.display = "flex";
+        document.getElementById("switcher-panel").style.display = "none";
+      } else if (stepId === 'results') {
+        document.getElementById("step-results").classList.add("active");
+        document.getElementById("switcher-panel").style.display = "none";
+      }
+    }
+
+    // Start IQ Test Quiz
+    function startCognitiveQuiz() {
+      // Reset quiz state
+      quizAnswers = {};
+      currentQuizIndex = 0;
+      quizSecondsElapsed = 0;
+      
+      // Timer setup
+      document.getElementById("quiz-timer-label").textContent = "Time: 00:00";
+      clearInterval(quizTimerInterval);
+      quizTimerInterval = setInterval(() => {
+        quizSecondsElapsed++;
+        const minutes = Math.floor(quizSecondsElapsed / 60).toString().padStart(2, '0');
+        const seconds = (quizSecondsElapsed % 60).toString().padStart(2, '0');
+        document.getElementById("quiz-timer-label").textContent = `Time: ${minutes}:${seconds}`;
+      }, 1000);
+
+      goToEvalStep('quiz');
+      renderQuizQuestion();
+    }
+
+    // Render Question
+    function renderQuizQuestion() {
+      const q = IQ_QUESTIONS[currentQuizIndex];
+      
+      // Update text indicators
+      document.getElementById("quiz-progress-label").textContent = `Question ${currentQuizIndex + 1} of 20`;
+      document.getElementById("quiz-category-label").textContent = q.category;
+      document.getElementById("quiz-question-element").innerHTML = q.question;
+
+      // Update progress bar
+      const percent = ((currentQuizIndex) / 20) * 100;
+      document.getElementById("quiz-progress-bar").style.width = `${percent}%`;
+
+      // Options
+      const optionsWrap = document.getElementById("quiz-options-element");
+      optionsWrap.innerHTML = "";
+
+      const letters = ["A", "B", "C", "D"];
+      q.options.forEach((optText, optIdx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mcq-option";
+        if (quizAnswers[currentQuizIndex] === optIdx) {
+          btn.className += " selected";
+        }
+        btn.innerHTML = `<span class="mcq-option-letter">${letters[optIdx]}</span> ${optText}`;
+        btn.onclick = () => selectQuizAnswer(optIdx, btn);
+        optionsWrap.appendChild(btn);
+      });
+
+      // Controls setup
+      document.getElementById("btn-quiz-back").disabled = (currentQuizIndex === 0);
+      const nextBtn = document.getElementById("btn-quiz-next");
+      nextBtn.disabled = (quizAnswers[currentQuizIndex] === undefined);
+      nextBtn.textContent = currentQuizIndex === 19 ? "Finalize Profile Analysis" : "Next Question →";
+    }
+
+    function selectQuizAnswer(optIdx, btnEl) {
+      quizAnswers[currentQuizIndex] = optIdx;
+
+      // Unselect siblings
+      const siblings = btnEl.parentNode.children;
+      for (let s of siblings) {
+        s.classList.remove("selected");
+      }
+      btnEl.classList.add("selected");
+      
+      document.getElementById("btn-quiz-next").disabled = false;
+    }
+
+    function previousQuizQuestion() {
+      if (currentQuizIndex > 0) {
+        currentQuizIndex--;
+        renderQuizQuestion();
+      }
+    }
+
+    function nextQuizQuestion() {
+      if (currentQuizIndex < 19) {
+        currentQuizIndex++;
+        renderQuizQuestion();
+      } else {
+        // Stop timer and analyze
+        clearInterval(quizTimerInterval);
+        goToEvalStep('terminal');
+        runMCQTerminalSimulation();
+      }
+    }
+
+    // Terminal Evaluation Simulation
+    function runMCQTerminalSimulation() {
+      const term = document.getElementById("step-terminal");
+      term.innerHTML = "";
+
+      const logs = [
+        { text: "⏳ Terminating cognitive examination sequence...", delay: 200, type: "info" },
+        { text: "⚡ Processing question score arrays...", delay: 450, type: "" },
+        { text: "🧠 Calculating IQ score utilizing Standard Bell Curve (Mean: 100, SD: 15)...", delay: 750, type: "" },
+        { text: "✅ Cognitive indices determined successfully.", delay: 1050, type: "success" },
+        { text: "⚡ Loading academic parameter metric matrix...", delay: 1350, type: "" },
+        { text: "🤖 Querying Logistic Regression ML prediction endpoint...", delay: 1650, type: "warn" }
+      ];
+
+      logs.forEach((log) => {
+        setTimeout(() => {
+          const div = document.createElement("div");
+          div.className = "terminal-line " + log.type;
+          div.textContent = `[EVAL-SYS] ${log.text}`;
+          term.appendChild(div);
+          term.scrollTop = term.scrollHeight;
+        }, log.delay);
+      });
+
+      // Calculate score
+      let correctAnswersCount = 0;
+      IQ_QUESTIONS.forEach((q, idx) => {
+        if (quizAnswers[idx] === q.correctIndex) {
+          correctAnswersCount++;
+        }
+      });
+
+      // Z-score calculation mapping: Mean correct=10, SD=3.2
+      // z = (correct - 10) / 3.2
+      // IQ = 100 + z * 15
+      const z = (correctAnswersCount - 10) / 3.2;
+      const calculatedIq = Math.max(70, Math.min(150, Math.round(100 + z * 15)));
+      const cgpaVal = parseFloat(evalCgpaNum.value);
+
+      setTimeout(async () => {
+        const url = window.location.origin.startsWith("file://") || window.location.origin === "null" || window.location.origin.includes("127.0.0.1")
+          ? "http://127.0.0.1:5000/predict"
+          : "/predict";
+
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ IQ: calculatedIq, CGPA: cgpaVal })
+          });
+
+          if (!response.ok) throw new Error("Predict request failed");
+
+          const data = await response.json();
+          const isPlaced = data.placed === 1;
+          const probVal = data.probability || 0.0;
+
+          const div = document.createElement("div");
+          div.className = "terminal-line success blink";
+          div.textContent = "[SUCCESS] ML Prediction retrieved. Compiling outcome telemetry...";
+          term.appendChild(div);
+
+          setTimeout(() => {
+            // Populate results step
+            document.getElementById("metric-iq").textContent = calculatedIq;
+            document.getElementById("metric-cgpa").textContent = cgpaVal.toFixed(1);
+
+            // Update radial progress bar
+            const radialBar = document.getElementById("eval-radial-bar");
+            const probText = document.getElementById("eval-prob-value");
+            const outcomePanel = document.getElementById("eval-outcome-panel");
+            const outcomeStatus = document.getElementById("eval-outcome-status");
+            const outcomeDesc = document.getElementById("eval-outcome-desc");
+
+            const offset = 408.4 - (408.4 * probVal) / 100;
+            radialBar.style.stroke = isPlaced ? "var(--success)" : "var(--danger)";
+            radialBar.style.strokeDashoffset = offset;
+            probText.textContent = `${probVal.toFixed(1)}%`;
+
+            outcomePanel.className = "outcome-description-panel " + (isPlaced ? "placed" : "not-placed");
+            outcomeStatus.textContent = isPlaced ? "Placement Highly Probable!" : "Skill Building Advised";
+            
+            // Build detailed descriptive message
+            let feedbackMsg = `Your computed IQ of ${calculatedIq} (correct answers: ${correctAnswersCount}/20) and CGPA of ${cgpaVal.toFixed(1)} were processed. `;
+            feedbackMsg += data.message;
+            outcomeDesc.textContent = feedbackMsg;
+
+            goToEvalStep('results');
+            if (isPlaced) triggerConfetti();
+          }, 800);
+
+        } catch (err) {
+          const div = document.createElement("div");
+          div.className = "terminal-line warn";
+          div.textContent = "[ERROR] Server offline. Implementing client-side heuristics logic...";
+          term.appendChild(div);
+
+          setTimeout(() => {
+            // Simulated fallback prediction logic client-side
+            const cgpa_norm = cgpaVal / 10.0;
+            const iq_norm = calculatedIq / 150.0;
+            const score = (cgpa_norm * 0.72) + (iq_norm * 0.28);
+            const prob = 1.0 / (1.0 + Math.exp(-12.0 * (score - 0.61)));
+            const probVal = Math.round(prob * 10000) / 100;
+            const isPlaced = probVal >= 50.0;
+
+            document.getElementById("metric-iq").textContent = calculatedIq;
+            document.getElementById("metric-cgpa").textContent = cgpaVal.toFixed(1);
+
+            const radialBar = document.getElementById("eval-radial-bar");
+            const probText = document.getElementById("eval-prob-value");
+            const outcomePanel = document.getElementById("eval-outcome-panel");
+            const outcomeStatus = document.getElementById("eval-outcome-status");
+            const outcomeDesc = document.getElementById("eval-outcome-desc");
+
+            const offset = 408.4 - (408.4 * probVal) / 100;
+            radialBar.style.stroke = isPlaced ? "var(--success)" : "var(--danger)";
+            radialBar.style.strokeDashoffset = offset;
+            probText.textContent = `${probVal.toFixed(1)}%`;
+
+            outcomePanel.className = "outcome-description-panel " + (isPlaced ? "placed" : "not-placed");
+            outcomeStatus.textContent = isPlaced ? "Placement Highly Probable! (Heuristics)" : "Skill Building Advised (Heuristics)";
+            
+            let feedbackMsg = `Your computed IQ is ${calculatedIq} (correct answers: ${correctAnswersCount}/20) and CGPA is ${cgpaVal.toFixed(1)}. `;
+            feedbackMsg += isPlaced 
+              ? "✅ Placement Ho Jayegi! 🎉 (Fallback Client-Side Heuristic)" 
+              : "❌ Placement Nhi Hogi. Skills pe dhyaan doooooooo! (Fallback Client-Side Heuristic)";
+            outcomeDesc.textContent = feedbackMsg;
+
+            goToEvalStep('results');
+            if (isPlaced) triggerConfetti();
+          }, 1000);
+        }
+
+      }, 2000);
+    }
+
+    function resetCognitiveWizard() {
+      goToEvalStep('intro');
+    }
+
+    // ==========================================
+    // RADIAL/PARTICLE CONFETTI ANIMATIONS
+    // ==========================================
+    const canvas = document.getElementById("confetti-canvas");
+    const ctx = canvas.getContext("2d");
+    let particles = [];
+    let animationId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    class ConfettiParticle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * -canvas.height - 20;
+        this.size = Math.random() * 8 + 6;
+        this.color = ["#6366f1", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"][Math.floor(Math.random() * 6)];
+        this.speedX = Math.random() * 3 - 1.5;
+        this.speedY = Math.random() * 5 + 4;
+        this.rotation = Math.random() * 360;
+        this.rotationSpeed = Math.random() * 4 - 2;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.rotation += this.rotationSpeed;
+      }
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate((this.rotation * Math.PI) / 180);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+        ctx.restore();
+      }
+    }
+
+    function triggerConfetti() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        particles = [];
+      }
+      for (let i = 0; i < 140; i++) {
+        particles.push(new ConfettiParticle());
+      }
+      animateConfetti();
+    }
+
+    function animateConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let active = false;
+      particles.forEach((p) => {
+        p.update();
+        p.draw();
+        if (p.y < canvas.height) {
+          active = true;
+        }
+      });
+      if (active) {
+        animationId = requestAnimationFrame(animateConfetti);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  </script>
+</body>
+</html>
